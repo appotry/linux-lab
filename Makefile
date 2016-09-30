@@ -278,13 +278,15 @@ endif
 endif
 
 # Configure Kernel
-KCO ?= 1
 kernel-checkout:
-ifneq ($(KCO),0)
 	cd $(KERNEL_SRC) && git checkout -f linux-$(LINUX).y && cd $(TOP_DIR)
+
+KCO ?= 0
+ifeq ($(KCO),1)
+KERNEL_CHECKOUT = kernel-checkout
 endif
 
-kernel-defconfig: $(MACH_DIR)/linux_$(LINUX)_defconfig kernel-checkout
+kernel-defconfig: $(MACH_DIR)/linux_$(LINUX)_defconfig $(KERNEL_CHECKOUT)
 	mkdir -p $(KERNEL_OUTPUT)
 	cp $(MACH_DIR)/linux_$(LINUX)_defconfig $(KERNEL_SRC)/arch/$(ARCH)/configs/
 	make O=$(KERNEL_OUTPUT) -C $(KERNEL_SRC) ARCH=$(ARCH) linux_$(LINUX)_defconfig
@@ -299,10 +301,12 @@ KPD=$(TOP_DIR)/patch/linux/$(LINUX)/
 
 KP ?= 1
 kernel-patch:
-ifneq ($(KP),0)
 	# Kernel 2.6.x need include/linux/compiler-gcc5.h
 	-$(foreach p,$(shell ls $(KPD_MACH)),$(shell echo patch -r- -N -l -d $(KERNEL_SRC) -p1 \< $(KPD_MACH)/$p\;))
 	-$(foreach p,$(shell ls $(KPD)),$(shell echo patch -r- -N -l -d $(KERNEL_SRC) -p1 \< $(KPD)/$p\;))
+
+ifeq ($(KP),1)
+KERNEL_PATCH = kernel-patch
 endif
 
 IMAGE = $(shell basename $(ORIIMG))
@@ -315,14 +319,16 @@ ifneq ($(ORIDTB),)
   DTBS=dtbs
 endif
 
-kernel: kernel-patch
+kernel: $(KERNEL_PATCH)
 	PATH=$(PATH):$(CCPATH) make O=$(KERNEL_OUTPUT) -C $(KERNEL_SRC) ARCH=$(ARCH) CROSS_COMPILE=$(CCPRE) -j$(HOST_CPU_THREADS) $(IMAGE) $(DTBS)
 
 # Configure Uboot
-BCO ?= 1
 uboot-checkout:
-ifneq ($(BCO),0)
 	cd $(BOOTLOADER_SRC) && git checkout -f $(UBOOT) && cd $(TOP_DIR)
+
+BCO ?= 0
+ifeq ($(BCO),1)
+UBOOT_CHECKOUT = uboot-checkout
 endif
 
 UPD_MACH=$(TOP_DIR)/machine/$(MACH)/patch/uboot/$(UBOOT)/
@@ -330,7 +336,6 @@ UPD=$(TOP_DIR)/patch/uboot/$(UBOOT)/
 
 UP ?= 1
 uboot-patch:
-ifneq ($(UP),0)
 ifneq ($(UPATCH),)
 	git checkout -- $(UPD_MACH)/$(UPATCH)
 	sed -i "s/ROUTE_ADDR/$(ROUTE)/g" $(UPD_MACH)/$(UPATCH)
@@ -349,9 +354,12 @@ endif
 endif
 	-$(foreach p,$(shell ls $(UPD)),$(shell echo patch -r- -N -l -d $(BOOTLOADER_SRC) -p1 \< $(UPD)/$p\;))
 	git checkout -- $(UPD_MACH)/$(UPATCH)
+
+ifeq ($(UP),1)
+UBOOT_PATCH = uboot-patch
 endif
 
-uboot-defconfig: $(MACH_DIR)/uboot_$(UBOOT)_defconfig uboot-checkout uboot-patch
+uboot-defconfig: $(MACH_DIR)/uboot_$(UBOOT)_defconfig $(UBOOT_CHECKOUT) $(UBOOT_PATCH)
 	mkdir -p $(BOOTLOADER_OUTPUT)
 	cp $(MACH_DIR)/uboot_$(UBOOT)_defconfig $(BOOTLOADER_SRC)/configs/
 	make O=$(BOOTLOADER_OUTPUT) -C $(BOOTLOADER_SRC) ARCH=$(ARCH) uboot_$(UBOOT)_defconfig
@@ -362,6 +370,9 @@ uboot-menuconfig:
 # Build Uboot
 uboot:
 	PATH=$(PATH):$(CCPATH) make O=$(BOOTLOADER_OUTPUT) -C $(BOOTLOADER_SRC) ARCH=$(ARCH) CROSS_COMPILE=$(CCPRE) -j$(HOST_CPU_THREADS)
+
+# Checkout kernel and Rootfs
+checkout: kernel-checkout
 
 # Config Kernel and Rootfs
 config: root-defconfig kernel-defconfig

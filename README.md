@@ -84,10 +84,12 @@ Download the sources:
     $ make kernel-source  # One by one
     $ make buildroot-source
 
-Configure the sources:
+Checkout/Configure the sources:
 
+    $ make checkout
     $ make config           # Configure all with defconfig
 
+    $ make kernel-checkout  # Checkout the specific version, *Please make sure changes are saved before do it!*
     $ make kernel-defconfig # Configure one by one
     $ make root-defconfig
 
