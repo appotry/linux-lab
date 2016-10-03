@@ -1,2 +1,3 @@
-rootfs.cpio.uboot
 uImage
+dtb
+ramdisk

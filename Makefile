@@ -224,6 +224,8 @@ buildroot-source:
 
 source: kernel-source buildroot-source
 
+all-source: source uboot-source qemu-source
+
 # Qemu
 
 QCO ?= 1
@@ -239,7 +241,9 @@ QP ?= 1
 emulator-patch: emulator-checkout
 ifneq ($(QEMU),)
 ifneq ($(QP),0)
+ifeq ($(QPD),$(wildcard $(QPD)))
 	-$(foreach p,$(shell ls $(QPD)),$(shell echo patch -r- -N -l -d $(QEMU_SRC) -p1 \< $(QPD)/$p\;))
+endif
 endif
 endif
 
@@ -302,8 +306,12 @@ KPD=$(TOP_DIR)/patch/linux/$(LINUX)/
 KP ?= 1
 kernel-patch:
 	# Kernel 2.6.x need include/linux/compiler-gcc5.h
+ifeq ($(KPD_MACH),$(wildcard $(KPD_MACH)))
 	-$(foreach p,$(shell ls $(KPD_MACH)),$(shell echo patch -r- -N -l -d $(KERNEL_SRC) -p1 \< $(KPD_MACH)/$p\;))
+endif
+ifeq ($(KPD),$(wildcard $(KPD)))
 	-$(foreach p,$(shell ls $(KPD)),$(shell echo patch -r- -N -l -d $(KERNEL_SRC) -p1 \< $(KPD)/$p\;))
+endif
 
 ifeq ($(KP),1)
 KERNEL_PATCH = kernel-patch
@@ -320,7 +328,7 @@ ifneq ($(ORIDTB),)
 endif
 
 kernel: $(KERNEL_PATCH)
-	PATH=$(PATH):$(CCPATH) make O=$(KERNEL_OUTPUT) -C $(KERNEL_SRC) ARCH=$(ARCH) CROSS_COMPILE=$(CCPRE) -j$(HOST_CPU_THREADS) $(IMAGE) $(DTBS)
+	PATH=$(PATH):$(CCPATH) make O=$(KERNEL_OUTPUT) -C $(KERNEL_SRC) ARCH=$(ARCH) LOADADDR=$(KRN_ADDR) CROSS_COMPILE=$(CCPRE) -j$(HOST_CPU_THREADS) $(IMAGE) $(DTBS)
 
 # Configure Uboot
 uboot-checkout:
@@ -335,25 +343,30 @@ UPD_MACH=$(TOP_DIR)/machine/$(MACH)/patch/uboot/$(UBOOT)/
 UPD=$(TOP_DIR)/patch/uboot/$(UBOOT)/
 
 UP ?= 1
+
+ROOTDIR ?= -
+KRN_ADDR ?= -
+RDK_ADDR ?= -
+DTB_ADDR ?= -
+UCFG_DIR = $(TOP_DIR)/u-boot/include/configs/
+
+ifneq ($(findstring /dev/ram,$(ROOTDEV)),/dev/ram)
+  RDK_ADDR = -
+endif
+ifeq ($(ORIDTB),)
+  DTB_ADDR = -
+endif
+
 uboot-patch:
-ifneq ($(UPATCH),)
-	git checkout -- $(UPD_MACH)/$(UPATCH)
-	sed -i "s/ROUTE_ADDR/$(ROUTE)/g" $(UPD_MACH)/$(UPATCH)
-	sed -i "s/IP_ADDR/$(IP)/g" $(UPD_MACH)/$(UPATCH)
-ifeq ($(ROOTDEV),/dev/nfs)
-	sed -i "s%root=/dev/ram%root=/dev/nfs nfsroot=$(ROUTE):$(ROOTDIR) ip=$(IP)%g" $(UPD_MACH)/$(UPATCH)
-	sed -i "s/tftpboot 0x00807fc0 rootfs.cpio.uboot;//g" $(UPD_MACH)/$(UPATCH)
-	sed -i "s/bootm 0x7fc0 0x807fc0/bootm 0x7fc0/g" $(UPD_MACH)/$(UPATCH)
+ifneq ($(UCONFIG),)
+	$(TOP_DIR)/tools/uboot/config.sh $(IP) $(ROUTE) $(ROOTDEV) $(ROOTDIR) $(KRN_ADDR) $(RDK_ADDR) $(DTB_ADDR) $(UCFG_DIR)/$(UCONFIG)
 endif
-ifeq ($(HD),1)
-	sed -i "s%root=/dev/ram%root=$(ROOTDEV)%g" $(UPD_MACH)/$(UPATCH)
-	sed -i "s/tftpboot 0x00807fc0 rootfs.cpio.uboot;//g" $(UPD_MACH)/$(UPATCH)
-	sed -i "s/bootm 0x7fc0 0x807fc0/bootm 0x7fc0/g" $(UPD_MACH)/$(UPATCH)
-endif
+ifeq ($(UPD_MACH),$(wildcard $(UPD_MACH)))
 	cp -r $(UPD_MACH)/* $(UPD)/
 endif
+ifeq ($(UPD),$(wildcard $(UPD)))
 	-$(foreach p,$(shell ls $(UPD)),$(shell echo patch -r- -N -l -d $(BOOTLOADER_SRC) -p1 \< $(UPD)/$p\;))
-	git checkout -- $(UPD_MACH)/$(UPATCH)
+endif
 
 ifeq ($(UP),1)
 UBOOT_PATCH = uboot-patch
@@ -398,7 +411,10 @@ uboot-save:
 	-cp $(UBOOT_BIMAGE) $(PREBUILT_UBOOTDIR)
 
 uconfig-save:
-	-cp $(BOOTLOADER_OUTPUT)/.config $(MACH_DIR)/uboot_$(UBOOT)_defconfig
+	-PATH=$(PATH):$(CCPATH) make O=$(BOOTLOADER_OUTPUT) -C $(BOOTLOADER_SRC) ARCH=$(ARCH) savedefconfig
+	if [ -f $(BOOTLOADER_OUTPUT)/defconfig ]; \
+	then cp $(BOOTLOADER_OUTPUT)/defconfig $(MACH_DIR)/uboot_$(UBOOT)_defconfig; \
+	else cp $(BOOTLOADER_OUTPUT)/.config $(MACH_DIR)/uboot_$(UBOOT)_defconfig; fi
 
 # kernel < 2.6.36 doesn't support: `make savedefconfig`
 kconfig-save:
@@ -425,6 +441,14 @@ ifeq ($(U),0)
   ifeq ($(findstring /dev/ram,$(ROOTDEV)),/dev/ram)
     BOOT_CMD += -initrd $(ROOTFS)
   endif
+  ifeq ($(DTB),$(wildcard $(DTB)))
+    BOOT_CMD += -dtb $(DTB)
+  endif
+  ifeq ($(G),0)
+    BOOT_CMD += -append '$(CMDLINE) console=$(SERIAL)'
+  else
+    BOOT_CMD += -append '$(CMDLINE) console=$(CONSOLE)'
+  endif
 endif
 ifeq ($(findstring /dev/hda,$(ROOTDEV)),/dev/hda)
   BOOT_CMD += -hda $(HROOTFS)
@@ -435,16 +459,8 @@ endif
 ifeq ($(findstring /dev/mmc,$(ROOTDEV)),/dev/mmc)
   BOOT_CMD += -sd $(HROOTFS)
 endif
-ifeq ($(DTB),$(wildcard $(DTB)))
-  BOOT_CMD += -dtb $(DTB)
-endif
-ifeq ($(U),0)
 ifeq ($(G),0)
-  BOOT_CMD += -append '$(CMDLINE) console=$(SERIAL)'
   BOOT_CMD += -nographic
-else
-  BOOT_CMD += -append '$(CMDLINE) console=$(CONSOLE)'
-endif
 endif
 ifneq ($(DEBUG),)
   BOOT_CMD += -s -S
@@ -477,13 +493,18 @@ ifeq ($(findstring /dev/ram,$(ROOTDEV)),/dev/ram)
 endif
 
 $(UKIMAGE):
+ifeq ($(PBK),0)
 	make kernel IMAGE=uImage
+endif
 
 tftp: $(ROOTFS) $(UKIMAGE)
 ifeq ($(findstring /dev/ram,$(ROOTDEV)),/dev/ram)
-	-cp $(ROOTFS) $(TFTPBOOT)
+	-cp $(ROOTFS) $(TFTPBOOT)/ramdisk
 endif
-	-cp $(UKIMAGE) $(TFTPBOOT)
+ifeq ($(DTB),$(wildcard $(DTB)))
+	-cp $(DTB) $(TFTPBOOT)/dtb
+endif
+	-cp $(UKIMAGE) $(TFTPBOOT)/uImage
 else
 tftp:
 endif
@@ -492,7 +513,7 @@ decompress:
 ifeq ($(HD),1)
 ifneq ($(PBR),0)
 ifneq ($(HROOTFS),$(wildcard $(HROOTFS)))
-	tools/rootfs/mkfs.sh $(ROOTDIR) $(FSTYPE)
+	$(TOP_DIR)/tools/rootfs/mkfs.sh $(ROOTDIR) $(FSTYPE)
 endif
 endif
 endif

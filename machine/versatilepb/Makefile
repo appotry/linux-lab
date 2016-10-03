@@ -3,8 +3,12 @@ XARCH    = $(ARCH)
 CPU     ?= arm926t
 MEM     ?= 128M
 UBOOT   ?= v2015.07
-UPATCH  ?= versatile.h.patch
+# Need comment ORIDTB for 2.6.36 Linux
 LINUX   ?= 4.6
+KRN_ADDR?= 0x007fc0
+RDK_ADDR?= 0x907fc0
+DTB_ADDR?= 0x800000
+UCONFIG ?= versatile.h
 NETDEV  ?= smc91c111
 SERIAL  ?= ttyAMA0
 ROOTDEV ?= /dev/ram0
