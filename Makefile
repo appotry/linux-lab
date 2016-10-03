@@ -224,6 +224,8 @@ buildroot-source:
 
 source: kernel-source buildroot-source
 
+core-source: source uboot-source
+
 all-source: source uboot-source qemu-source
 
 # Qemu
