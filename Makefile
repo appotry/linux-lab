@@ -196,17 +196,21 @@ endif
 
 # For debug
 mach:
-	@find machine/$(MACH) -name "Makefile" -printf "[ %p ]:\n" -exec cat -n {} \; \
-		| sed -e "s%machine/\(.*\)/Makefile%\1%g" \
-		| sed -e "s/[[:digit:]]\{2,\}\t/  /g;s/[[:digit:]]\{1,\}\t/ /g"
+	@find $(TOP_DIR)/machine/$(MACH) -name "Makefile" -printf "[ %p ]:\n" -exec cat -n {} \; \
+		| sed -e "s%$(TOP_DIR)/machine/\(.*\)/Makefile%\1%g" \
+		| sed -e "s/[[:digit:]]\{2,\}\t/  /g;s/[[:digit:]]\{1,\}\t/ /g" \
+		| egrep "$(FILTER)"
 ifneq ($(MACH),)
 	@echo $(MACH) > $(TOP_DIR)/.config
 endif
 
+list-short:
+	@make -s mach MACH= FILTER="^ *ARCH |[a-z0-9]* \]:|^ *CPU|^ *LINUX|^ *ARCH|^ *ROOTDEV"
+
 list: mach-list
 
 mach-list:
-	make mach MACH=
+	@make mach MACH=
 
 # Please makesure docker, git are installed
 # TODO: Use gitsubmodule instead, ref: http://tinylab.org/nodemcu-kickstart/
