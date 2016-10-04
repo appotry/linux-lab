@@ -1,8 +1,9 @@
 
 # Linux Lab
 
-This project aims to make a Qemu-based Linux development Lab to easier the
-learning and development of the [Linux Kernel](http://www.kernel.org).
+This project aims to make a Qemu-based Linux development Lab to easier the learning and development of the [Linux Kernel](http://www.kernel.org).
+
+A full Chinese document is added: [Using Linux Lab to do embedded linux development](http://tinylab.org/using-linux-lab-to-do-embedded-linux-development/).
 
 For Linux 0.11, please try our [Linux 0.11 Lab](http://github.com/tinyclub/linux-0.11-lab).
 
@@ -21,6 +22,7 @@ For Linux 0.11, please try our [Linux 0.11 Lab](http://github.com/tinyclub/linux
 
     $ sudo tools/install-docker-lab.sh
     $ tools/update-lab-uid.sh
+    $ tools/update-lab-identify.sh  # Disable VNC login password
     $ tools/run-docker-lab.sh
     $ tools/open-docker-lab.sh
 
@@ -34,13 +36,9 @@ Login the VNC page via `tools/open-docker-lab.sh` with 'ubuntu' password, and th
 
     $ sudo -s
     # cd /linux-lab
-    # make boot
+    # make boot U=0
 
 **Notes**
-
-If don't want to input the password, after login, remove it with this command:
-
-    # passwd -d ubuntu
 
 If the screen size doesn't fit your display, set the scaling mode via the setting button on the top right side, or just modify the `-screen 0 1720x960x16` of `tools/supervisord.conf` to your own. the second method need to rerun `tools/install-docker-lab.sh` and `tools/run-docker-lab-daemon.h`.
 
@@ -48,52 +46,54 @@ If the screen size doesn't fit your display, set the scaling mode via the settin
 
 Check supported machines:
 
-    $ make list
+    $ make list-short
+    [ pc ]:
+          ARCH     = x86
+          CPU     ?= i686
+          LINUX   ?= 4.6
+          ROOTDEV ?= /dev/ram0
+    [ g3beige ]:
+          ARCH     = powerpc
+          CPU     ?= generic
+          LINUX   ?= 4.6
+          ROOTDEV ?= /dev/ram0
+    [ vexpress-a9 ]:
+          ARCH     = arm
+          CPU     ?= cortex-a9
+          LINUX   ?= 4.6
+          ROOTDEV ?= /dev/mmcblk0
+    [ malta ]:
+          ARCH     = mips
+          CPU     ?= mips32r2
+          LINUX   ?= 4.6
+          ROOTDEV ?= /dev/ram0
+    [ versatilepb ]:
+          ARCH     = arm
+          CPU     ?= arm926t
+          LINUX   ?= 4.6
+          ROOTDEV ?= /dev/ram0
 
 Check the machine specifci configuration:
 
-    $ make list | grep Makefile
-    * [machine/pc/Makefile]
-    * [machine/versatilepb/Makefile]
-    * [machine/g3beige/Makefile]
-    * [machine/malta/Makefile]
     $ cat machine/versatilepb/Makefile
-    ARCH=arm
-    XARCH=$(ARCH)
-    CPU=arm926t
-    MEM=128M
-    LINUX=2.6.35
-    NETDEV=smc91c111
-    SERIAL=ttyAMA0
-    ROOTDEV=/dev/nfs
-    ORIIMG=arch/$(ARCH)/boot/zImage
-    CCPRE=arm-linux-gnueabi-
-    KIMAGE=$(PREBUILT_KERNEL)/$(XARCH)/$(MACH)/$(LINUX)/zImage
-    ROOTFS=$(PREBUILT_ROOTFS)/$(XARCH)/$(CPU)/rootfs.cpio.gz
-
-Disable prebuilt kernel and rootfs via comment the `KIMAGE` and `ROOTFS`:
-
-    $ vim machine/versatilepb/Makefile
-    #KIMAGE=$(PREBUILT_KERNEL)/$(XARCH)/$(MACH)/$(LINUX)/zImage
-    #ROOTFS=$(PREBUILT_ROOTFS)/$(XARCH)/$(CPU)/rootfs.cpio.gz
 
 Download the sources:
 
-    $ make source -j3     # All in one
+    $ make core-source -j3     # All in one
 
-    $ make kernel-source  # One by one
+    $ make kernel-source       # One by one 
     $ make buildroot-source
 
 Checkout/Configure the sources:
 
-    $ make checkout
-    $ make config           # Configure all with defconfig
+    $ make checkout         # Without uboot
+    $ make config           # Configure all with defconfig, without uboot
 
     $ make kernel-checkout  # Checkout the specific version, *Please make sure changes are saved before do it!*
     $ make kernel-defconfig # Configure one by one
     $ make root-defconfig
 
-    $ make kernel-defconfig KCO=0 # Disable checkout action
+    $ make kernel-defconfig
 
 Manually configure the sources:
 
@@ -102,7 +102,7 @@ Manually configure the sources:
 
 Build them:
 
-    $ make build   # All in one
+    $ make build   # All in one without uboot
 
     $ make kernel  # One by one
     $ make root
@@ -143,7 +143,7 @@ Debug it:
 
 Save your changes:
 
-    $ make save         # Save all of the configs and rootfs/kernel images
+    $ make save         # Save all of the configs and rootfs/kernel/dtb images
 
     $ make kconfig-save # Save configs to machine/BOARD/, kernel config
     $ make rconfig-save # rootfs config
@@ -162,9 +162,10 @@ and boot for a specific machine with 'MACH', for example:
     $ make MACH=malta
     $ make root-defconfig
     $ make root
+    $ make kernel-checkout
     $ make kernel-defconfig
     $ make kernel
-    $ make boot
+    $ make boot U=0
 
 
 ## More
