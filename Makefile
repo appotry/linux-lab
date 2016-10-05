@@ -267,8 +267,18 @@ toolchain-clean:
 	make -C $(TOOLCHAIN) clean
 
 # Rootfs
+
+RCO ?= 0
+BUILDROOT ?= master
+ifeq ($(RCO),1)
+  ROOT_CHECKOUT = root-checkout
+endif
+
 # Configure Buildroot
-root-defconfig: $(MACH_DIR)/buildroot_$(CPU)_defconfig
+root-checkout:
+	cd $(BUILDROOT_SRC) && git checkout -f $(BUILDROOT) && cd $(TOP_DIR)
+
+root-defconfig: $(MACH_DIR)/buildroot_$(CPU)_defconfig $(ROOT_CHECKOUT)
 	mkdir -p $(BUILDROOT_OUTPUT)
 	cp $(MACH_DIR)/buildroot_$(CPU)_defconfig $(BUILDROOT_SRC)/configs/
 	make O=$(BUILDROOT_OUTPUT) -C $(BUILDROOT_SRC) buildroot_$(CPU)_defconfig
@@ -292,8 +302,9 @@ kernel-checkout:
 	cd $(KERNEL_SRC) && git checkout -f linux-$(LINUX).y && cd $(TOP_DIR)
 
 KCO ?= 0
+LINUX ?= master
 ifeq ($(KCO),1)
-KERNEL_CHECKOUT = kernel-checkout
+  KERNEL_CHECKOUT = kernel-checkout
 endif
 
 kernel-defconfig: $(MACH_DIR)/linux_$(LINUX)_defconfig $(KERNEL_CHECKOUT)
@@ -320,7 +331,7 @@ ifeq ($(KPD),$(wildcard $(KPD)))
 endif
 
 ifeq ($(KP),1)
-KERNEL_PATCH = kernel-patch
+  KERNEL_PATCH = kernel-patch
 endif
 
 IMAGE = $(shell basename $(ORIIMG))
@@ -341,8 +352,9 @@ uboot-checkout:
 	cd $(BOOTLOADER_SRC) && git checkout -f $(UBOOT) && cd $(TOP_DIR)
 
 BCO ?= 0
+UBOOT ?= master
 ifeq ($(BCO),1)
-UBOOT_CHECKOUT = uboot-checkout
+  UBOOT_CHECKOUT = uboot-checkout
 endif
 
 UPD_MACH=$(TOP_DIR)/machine/$(MACH)/patch/uboot/$(UBOOT)/
@@ -375,7 +387,7 @@ ifeq ($(UPD),$(wildcard $(UPD)))
 endif
 
 ifeq ($(UP),1)
-UBOOT_PATCH = uboot-patch
+  UBOOT_PATCH = uboot-patch
 endif
 
 uboot-defconfig: $(MACH_DIR)/uboot_$(UBOOT)_defconfig $(UBOOT_CHECKOUT) $(UBOOT_PATCH)
